@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Database;
+use App\Services\Auth;
 use App\Services\PanelEngine;
 use App\Services\AnswerEvaluator;
 
@@ -17,6 +18,7 @@ final class SessionController
      */
     public function start(): void
     {
+        $user = Auth::require();
         $body = json_decode(file_get_contents('php://input'), true);
         $reportId = $body['report_id'] ?? null;
         $difficulty = $body['difficulty'] ?? 'normal';
@@ -28,7 +30,7 @@ final class SessionController
         }
 
         $conn = Database::conn();
-        $report = $conn->fetchAssociative('SELECT * FROM reports WHERE id = ?', [$reportId]);
+        $report = $conn->fetchAssociative('SELECT * FROM reports WHERE id = ? AND user_id = ?', [$reportId, $user['sub']]);
         if (!$report) {
             http_response_code(404);
             echo json_encode(['error' => 'Report not found']);
@@ -45,6 +47,7 @@ final class SessionController
 
         $conn->insert('sessions', [
             'report_id'  => $reportId,
+            'user_id'    => $user['sub'],
             'difficulty' => $difficulty,
             'status'     => 'active',
         ]);
@@ -71,6 +74,7 @@ final class SessionController
      */
     public function answer(): void
     {
+        $user = Auth::require();
         $body = json_decode(file_get_contents('php://input'), true);
         $sessionId = $body['session_id'] ?? null;
         $answerText = trim($body['answer_text'] ?? '');
@@ -82,7 +86,7 @@ final class SessionController
         }
 
         $conn = Database::conn();
-        $session = $conn->fetchAssociative('SELECT * FROM sessions WHERE id = ?', [$sessionId]);
+        $session = $conn->fetchAssociative('SELECT * FROM sessions WHERE id = ? AND user_id = ?', [$sessionId, $user['sub']]);
         if (!$session || $session['status'] !== 'active') {
             http_response_code(404);
             echo json_encode(['error' => 'Active session not found']);
@@ -187,6 +191,7 @@ final class SessionController
      */
     public function report(): void
     {
+        $user = Auth::require();
         $sessionId = $_GET['session_id'] ?? null;
         if (!$sessionId) {
             http_response_code(400);
@@ -195,7 +200,7 @@ final class SessionController
         }
 
         $conn = Database::conn();
-        $session = $conn->fetchAssociative('SELECT * FROM sessions WHERE id = ?', [$sessionId]);
+        $session = $conn->fetchAssociative('SELECT * FROM sessions WHERE id = ? AND user_id = ?', [$sessionId, $user['sub']]);
         if (!$session) {
             http_response_code(404);
             echo json_encode(['error' => 'Session not found']);

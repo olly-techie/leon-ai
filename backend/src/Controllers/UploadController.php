@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Database;
+use App\Services\Auth;
 use App\Services\PdfParser;
 use App\Services\WeaknessScanner;
 
@@ -12,6 +13,7 @@ final class UploadController
 {
     public function upload(): void
     {
+        $user = Auth::require();
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
             echo json_encode(['error' => 'Method not allowed']);
@@ -48,9 +50,10 @@ final class UploadController
 
         $conn = Database::conn();
         $conn->insert('reports', [
-            'filename'  => $file['name'],
-            'full_text' => $fullText,
-            'pages'     => json_encode($pages),
+            'user_id'    => $user['sub'],
+            'filename'   => $file['name'],
+            'full_text'  => $fullText,
+            'pages'      => json_encode($pages),
         ]);
         $reportId = $conn->lastInsertId();
 

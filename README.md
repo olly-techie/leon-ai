@@ -105,13 +105,17 @@ VITE_API_BASE_URL=http://localhost:8000
 
 ## API
 
-| Endpoint | Purpose |
-|---|---|
-| `POST /api/upload` | Upload PDF → `report_id` + weakness list |
-| `POST /api/session/start` | Body: `report_id`, `difficulty` → `session_id` + first question |
-| `POST /api/session/answer` | Body: `session_id`, `answer_text` → score, feedback, next turn |
-| `GET /api/session/report?session_id=` | Final scorecard |
-| `GET /health` | Health check (ping before demo to warm the instance) |
+All `/api/upload`, `/api/session/*` routes require `Authorization: Bearer <token>`.
+
+| Endpoint | Auth | Purpose |
+|---|---|---|
+| `POST /api/auth/register` | — | Body: `email`, `password` → `token` + user |
+| `POST /api/auth/login` | — | Body: `email`, `password` → `token` + user |
+| `POST /api/upload` | Bearer | Upload PDF → `report_id` + weakness list |
+| `POST /api/session/start` | Bearer | Body: `report_id`, `difficulty` → `session_id` + first question |
+| `POST /api/session/answer` | Bearer | Body: `session_id`, `answer_text` → score, feedback, next turn |
+| `GET /api/session/report?session_id=` | Bearer | Final scorecard |
+| `GET /health` | — | Health check (ping before demo to warm the instance) |
 
 ## Project structure
 
