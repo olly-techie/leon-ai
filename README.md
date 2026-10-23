@@ -137,8 +137,8 @@ All `/api/upload`, `/api/session/*` routes require `Authorization: Bearer <token
 
 ## Team
 
-- **Olly** — backend, AI pipeline, multi-agent panel
-- **Teammate** — frontend, product, demo
+- **Olayiwola Abdullah** — backend, AI pipeline, multi-agent panel
+- **Philip Jonathan** — frontend, product, demo
 
 ## License
 

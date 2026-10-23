@@ -7,7 +7,7 @@
 - **Hackathon:** Open//Build Hackathon (OSCA Ile-Ife x GDG OAU)
 - **Build window:** 25th to 29th Oct 2026
 - **Virtual demo day:** 31st Oct 2026
-- **Team:** 2 people — Backend and AI (Olly), Frontend and product (teammate)
+- **Team:** 2 people — Backend and AI (Olayiwola Abdullah), Frontend and product (Philip Jonathan)
 
 ## The problem
 
@@ -130,7 +130,7 @@ Example answer result shape:
 
 ## 5-day plan
 
-| Day | Backend and AI (Olly) | Frontend and product (teammate) |
+| Day | Backend and AI (Olayiwola Abdullah) | Frontend and product (Philip Jonathan) |
 |---|---|---|
 | 25 | Docker and Render deploy, Neon schema, CORS, PDF ingestion, weakness scan | Upload flow and session UI shell against mock data |
 | 26 | Panel engine: personas, orchestrator, follow-ups | Chat and voice interface |
