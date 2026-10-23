@@ -1,0 +1,16 @@
+{
+    "name": "olly/defence-panel-backend",
+    "description": "Defence Panel API — PHP 8.3 backend for the AI defence simulator",
+    "type": "project",
+    "require": {
+        "php": "^8.3",
+        "smalot/pdfparser": "^2.9",
+        "vlucas/phpdotenv": "^5.6",
+        "doctrine/dbal": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/"
+        }
+    }
+}
