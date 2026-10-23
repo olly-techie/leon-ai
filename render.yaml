@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: defence-panel-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_DIRECT_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false
+      - key: APP_ENV
+        value: production
+
+  - type: static_site
+    name: defence-panel-web
+    buildCommand: cd frontend && pnpm install && pnpm build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false

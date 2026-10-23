@@ -8,7 +8,7 @@ use Dotenv\Dotenv;
 use App\Services\Auth;
 
 $dotenv = Dotenv::createImmutable(__DIR__ . '/..');
-$dotenv->load();
+$dotenv->safeLoad(); // no-op if .env missing (Render injects env vars directly)
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: ' . ($_ENV['CORS_ORIGIN'] ?? '*'));

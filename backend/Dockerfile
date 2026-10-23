@@ -1,16 +1,30 @@
-FROM php:8.3-cli
+FROM php:8.3-apache
 
 RUN apt-get update && apt-get install -y libpq-dev libzip-dev unzip \
     && docker-php-ext-install pdo_pgsql zip \
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+RUN a2enmod rewrite
 
-COPY composer.json composer.lock* ./
+COPY composer.json composer.lock* /tmp/
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer \
-    && composer install --no-dev --no-interaction
+    && cd /tmp && composer install --no-dev --no-interaction
 
-COPY . .
+COPY . /var/www/html/
+RUN cp -r /tmp/vendor /var/www/html/vendor && rm -rf /tmp/*
 
-EXPOSE 8000
-CMD ["php", "-S", "0.0.0.0:8000", "-t", "public"]
+# Point DocumentRoot at public/
+RUN sed -ri -e 's!/var/www/html!/var/www/html/public!g' \
+    /etc/apache2/sites-available/000-default.conf \
+    /etc/apache2/apache2.conf \
+    /etc/apache2/conf-available/security.conf
+
+# Allow .htaccess rewrites
+RUN sed -ri -e 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
+
+ENV PORT=10000
+EXPOSE ${PORT}
+
+COPY docker-entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+ENTRYPOINT ["entrypoint.sh"]
