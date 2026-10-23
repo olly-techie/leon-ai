@@ -39,8 +39,8 @@ final class Auth
      */
     public static function user(): ?array
     {
-        $header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
-        if (!preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
+        $header = self::authHeader();
+        if ($header === null || !preg_match('/^Bearer\s+(.+)$/i', $header, $m)) {
             return null;
         }
         try {
@@ -52,6 +52,28 @@ final class Auth
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * Apache may not populate HTTP_AUTHORIZATION — fall back to
+     * getallheaders() (mod_php) and REDIRECT_HTTP_AUTHORIZATION.
+     */
+    private static function authHeader(): ?string
+    {
+        if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+            return $_SERVER['HTTP_AUTHORIZATION'];
+        }
+        if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            return $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        }
+        if (function_exists('getallheaders')) {
+            foreach (getallheaders() as $name => $value) {
+                if (strcasecmp($name, 'Authorization') === 0) {
+                    return $value;
+                }
+            }
+        }
+        return null;
     }
 
     /**
