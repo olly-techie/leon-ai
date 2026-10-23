@@ -20,8 +20,9 @@ services:
       - key: APP_ENV
         value: production
 
-  - type: static_site
+  - type: web
     name: defence-panel-web
+    runtime: static
     buildCommand: cd frontend && pnpm install && pnpm build
     staticPublishPath: frontend/dist
     envVars:
