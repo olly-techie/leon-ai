@@ -15,7 +15,7 @@ final class OpenRouter
     public function __construct()
     {
         $this->apiKey    = getenv('OPENROUTER_API_KEY') ?: '';
-        $this->fastModel = getenv('OPENROUTER_FAST_MODEL') ?: 'google/gemini-2.0-flash-001';
+        $this->fastModel = getenv('OPENROUTER_FAST_MODEL') ?: 'google/gemini-2.5-flash';
         $this->strongModel = getenv('OPENROUTER_STRONG_MODEL') ?: 'google/gemini-2.5-pro';
         $this->siteUrl   = getenv('OPENROUTER_SITE_URL') ?? 'http://localhost:5173';
         $this->appName   = getenv('OPENROUTER_APP_NAME') ?? 'Defence Panel';
@@ -28,9 +28,12 @@ final class OpenRouter
     public function chat(string $system, string $user, string $tier = 'fast', ?array $jsonSchema = null): string
     {
         $model = $tier === 'strong' ? $this->strongModel : $this->fastModel;
+        // Panel turns are tiny JSON (~300 tokens); scan/scores need more headroom.
+        $maxTokens = $tier === 'strong' ? 2000 : 800;
 
         $payload = [
             'model'       => $model,
+            'max_tokens'  => $maxTokens,
             'messages'    => [
                 ['role' => 'system', 'content' => $system],
                 ['role' => 'user',   'content' => $user],

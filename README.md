@@ -92,7 +92,7 @@ npm run dev            # http://localhost:5173
 DATABASE_URL=postgres://user:pass@host/neondb?sslmode=require   # pooled for app
 DATABASE_DIRECT_URL=postgres://user:pass@host/neondb?sslmode=require  # for migrations
 OPENROUTER_API_KEY=...
-OPENROUTER_FAST_MODEL=google/gemini-2.0-flash-001
+OPENROUTER_FAST_MODEL=google/gemini-2.5-flash
 OPENROUTER_STRONG_MODEL=google/gemini-2.5-pro
 CORS_ORIGIN=http://localhost:5173
 ```

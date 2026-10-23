@@ -45,13 +45,16 @@ final class SessionController
         $engine = new PanelEngine();
         $turn = $engine->firstQuestion($report['full_text'], $weaknesses, $difficulty);
 
-        $conn->insert('sessions', [
-            'report_id'  => $reportId,
-            'user_id'    => $user['sub'],
-            'difficulty' => $difficulty,
-            'status'     => 'active',
-        ]);
-        $sessionId = $conn->lastInsertId();
+        $sessionId = $conn->executeQuery(
+            'INSERT INTO sessions (report_id, user_id, difficulty, status)
+             VALUES (:report_id, :user_id, :difficulty, :status) RETURNING id',
+            [
+                'report_id'  => $reportId,
+                'user_id'    => $user['sub'],
+                'difficulty' => $difficulty,
+                'status'     => 'active',
+            ]
+        )->fetchOne();
 
         $conn->insert('turns', [
             'session_id'  => $sessionId,
@@ -59,7 +62,7 @@ final class SessionController
             'question'    => $turn['question'],
             'cited_page'  => $turn['cited_page'],
             'is_followup' => $turn['is_followup'],
-        ]);
+        ], ['is_followup' => \Doctrine\DBAL\Types\Types::BOOLEAN]);
 
         echo json_encode([
             'session_id' => $sessionId,
@@ -174,7 +177,7 @@ final class SessionController
             'question'    => $next['question'],
             'cited_page'  => $next['cited_page'],
             'is_followup' => $next['is_followup'],
-        ]);
+        ], ['is_followup' => \Doctrine\DBAL\Types\Types::BOOLEAN]);
 
         echo json_encode([
             'scores'           => $eval['scores'],

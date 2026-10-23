@@ -49,13 +49,16 @@ final class UploadController
         ));
 
         $conn = Database::conn();
-        $conn->insert('reports', [
-            'user_id'    => $user['sub'],
-            'filename'   => $file['name'],
-            'full_text'  => $fullText,
-            'pages'      => json_encode($pages),
-        ]);
-        $reportId = $conn->lastInsertId();
+        $reportId = $conn->executeQuery(
+            'INSERT INTO reports (user_id, filename, full_text, pages)
+             VALUES (:user_id, :filename, :full_text, :pages) RETURNING id',
+            [
+                'user_id'   => $user['sub'],
+                'filename'  => $file['name'],
+                'full_text' => $fullText,
+                'pages'     => json_encode($pages),
+            ]
+        )->fetchOne();
 
         // Run weakness scan
         $scanner = new WeaknessScanner();

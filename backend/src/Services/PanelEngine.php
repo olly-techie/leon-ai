@@ -79,7 +79,8 @@ PROMPT;
             ],
         ];
 
-        return $this->llm->chatJson($system, $user, 'fast', $schema);
+        $result = $this->llm->chatJson($system, $user, 'fast', $schema);
+        return $this->normalizeTurn($result);
     }
 
     /**
@@ -149,6 +150,21 @@ PROMPT;
             ],
         ];
 
-        return $this->llm->chatJson($system, $user, 'fast', $schema);
+        $result = $this->llm->chatJson($system, $user, 'fast', $schema);
+        return $this->normalizeTurn($result);
+    }
+
+    /**
+     * Coerce model output: booleans may arrive as ""/0/"false",
+     * cited_page as string — normalize before touching Postgres.
+     */
+    private function normalizeTurn(array $t): array
+    {
+        return [
+            'examiner'    => (string) ($t['examiner'] ?? 'hostile_external'),
+            'question'    => (string) ($t['question'] ?? ''),
+            'cited_page'  => (int) ($t['cited_page'] ?? 1),
+            'is_followup' => filter_var($t['is_followup'] ?? false, FILTER_VALIDATE_BOOLEAN),
+        ];
     }
 }
