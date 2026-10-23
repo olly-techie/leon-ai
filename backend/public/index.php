@@ -23,23 +23,16 @@ $uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 
 $routes = [
-    'GET'  => [
+    'GET' => [
         '/health' => fn() => json_encode(['status' => 'ok', 'time' => gmdate('c')]),
+        '/api/session/report' => [App\Controllers\SessionController::class, 'report'],
     ],
     'POST' => [
         '/api/upload'          => [App\Controllers\UploadController::class, 'upload'],
         '/api/session/start'   => [App\Controllers\SessionController::class, 'start'],
         '/api/session/answer'  => [App\Controllers\SessionController::class, 'answer'],
     ],
-    'GET' => array_merge($routes['GET'] ?? [], [
-        '/api/session/report' => [App\Controllers\SessionController::class, 'report'],
-    ]),
 ];
-
-// merge GET routes properly
-$routes['GET'] = array_merge([
-    '/health' => fn() => json_encode(['status' => 'ok', 'time' => gmdate('c')]),
-], $routes['GET']);
 
 if (!isset($routes[$method][$uri])) {
     http_response_code(404);
