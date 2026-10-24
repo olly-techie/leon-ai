@@ -7,12 +7,18 @@ require_once __DIR__ . '/vendor/autoload.php';
 use Dotenv\Dotenv;
 use App\Database;
 
-$dotenv = Dotenv::createImmutable(__DIR__);
+// createUnsafeImmutable so getenv() sees the values (services read via getenv)
+$dotenv = Dotenv::createUnsafeImmutable(__DIR__);
 $dotenv->load();
 
-$sql = file_get_contents(__DIR__ . '/migrations/001_init.sql');
-
 $conn = Database::direct();
-$conn->executeStatement($sql);
 
-echo "Migration 001_init.sql applied successfully.\n";
+$migrations = glob(__DIR__ . '/migrations/*.sql');
+sort($migrations);
+
+foreach ($migrations as $file) {
+    $conn->executeStatement(file_get_contents($file));
+    echo 'Applied ' . basename($file) . "\n";
+}
+
+echo "All migrations applied successfully.\n";

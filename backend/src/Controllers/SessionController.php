@@ -45,24 +45,31 @@ final class SessionController
         $engine = new PanelEngine();
         $turn = $engine->firstQuestion($report['full_text'], $weaknesses, $difficulty);
 
-        $sessionId = $conn->executeQuery(
-            'INSERT INTO sessions (report_id, user_id, difficulty, status)
-             VALUES (:report_id, :user_id, :difficulty, :status) RETURNING id',
-            [
-                'report_id'  => $reportId,
-                'user_id'    => $user['sub'],
-                'difficulty' => $difficulty,
-                'status'     => 'active',
-            ]
-        )->fetchOne();
+        $conn->beginTransaction();
+        try {
+            $sessionId = $conn->executeQuery(
+                'INSERT INTO sessions (report_id, user_id, difficulty, status)
+                 VALUES (:report_id, :user_id, :difficulty, :status) RETURNING id',
+                [
+                    'report_id'  => $reportId,
+                    'user_id'    => $user['sub'],
+                    'difficulty' => $difficulty,
+                    'status'     => 'active',
+                ]
+            )->fetchOne();
 
-        $conn->insert('turns', [
-            'session_id'  => $sessionId,
-            'examiner'    => $turn['examiner'],
-            'question'    => $turn['question'],
-            'cited_page'  => $turn['cited_page'],
-            'is_followup' => $turn['is_followup'],
-        ], ['is_followup' => \Doctrine\DBAL\Types\Types::BOOLEAN]);
+            $conn->insert('turns', [
+                'session_id'  => $sessionId,
+                'examiner'    => $turn['examiner'],
+                'question'    => $turn['question'],
+                'cited_page'  => $turn['cited_page'],
+                'is_followup' => $turn['is_followup'],
+            ], ['is_followup' => \Doctrine\DBAL\Types\Types::BOOLEAN]);
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+            throw $e;
+        }
 
         echo json_encode([
             'session_id' => $sessionId,
@@ -81,6 +88,8 @@ final class SessionController
         $body = json_decode(file_get_contents('php://input'), true);
         $sessionId = $body['session_id'] ?? null;
         $answerText = trim($body['answer_text'] ?? '');
+        // Sanitize: strip HTML/entities to prevent XSS when displaying answers later
+        $answerText = strip_tags(htmlentities($answerText, ENT_QUOTES, 'UTF-8'));
 
         if (!$sessionId || $answerText === '') {
             http_response_code(400);
@@ -119,29 +128,38 @@ final class SessionController
             $session['difficulty']
         );
 
-        // Persist answer + scores
-        $conn->update('turns', [
-            'answer'      => $answerText,
-            'accuracy'    => $eval['scores']['accuracy'],
-            'evidence'    => $eval['scores']['evidence'],
-            'composure'   => $eval['scores']['composure'],
-            'feedback'    => $eval['feedback'],
-            'model_answer'=> $eval['model_answer'],
-        ], ['id' => $lastTurn['id']]);
+        // Persist answer + scores, and close the session if this was the last turn
+        $conn->beginTransaction();
+        try {
+            $conn->update('turns', [
+                'answer'      => $answerText,
+                'accuracy'    => $eval['scores']['accuracy'],
+                'evidence'    => $eval['scores']['evidence'],
+                'composure'   => $eval['scores']['composure'],
+                'feedback'    => $eval['feedback'],
+                'model_answer'=> $eval['model_answer'],
+            ], ['id' => $lastTurn['id']]);
 
-        // Decide: end session after N turns, or generate next turn
-        $turnCount = (int) $conn->fetchOne(
-            'SELECT COUNT(*) FROM turns WHERE session_id = ? AND answer IS NOT NULL',
-            [$sessionId]
-        );
+            $turnCount = (int) $conn->fetchOne(
+                'SELECT COUNT(*) FROM turns WHERE session_id = ? AND answer IS NOT NULL',
+                [$sessionId]
+            );
 
-        $maxTurns = 6;
-        if ($turnCount >= $maxTurns) {
-            $conn->update('sessions', [
-                'status'   => 'completed',
-                'ended_at' => gmdate('c'),
-            ], ['id' => $sessionId]);
+            $maxTurns = $_ENV['MAX_SESSION_TURNS'] ?? 6;
+            $complete = $turnCount >= $maxTurns;
+            if ($complete) {
+                $conn->update('sessions', [
+                    'status'   => 'completed',
+                    'ended_at' => gmdate('c'),
+                ], ['id' => $sessionId]);
+            }
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+            throw $e;
+        }
 
+        if ($complete) {
             echo json_encode([
                 'scores'       => $eval['scores'],
                 'feedback'     => $eval['feedback'],

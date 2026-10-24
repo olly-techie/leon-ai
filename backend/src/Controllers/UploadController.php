@@ -27,8 +27,18 @@ final class UploadController
         }
 
         $file = $_FILES['pdf'];
+
+        $maxBytes = $_ENV['MAX_UPLOAD_SIZE'] ?? 15728640; // 15MB default
+        if (($file['size'] ?? 0) > $maxBytes) {
+            http_response_code(413);
+            echo json_encode(['error' => 'PDF must be 15MB or smaller']);
+            return;
+        }
+
         $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        if ($ext !== 'pdf') {
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = (string) $finfo->file($file['tmp_name']);
+        if ($ext !== 'pdf' || $mime !== 'application/pdf') {
             http_response_code(400);
             echo json_encode(['error' => 'File must be a PDF']);
             return;
@@ -48,30 +58,37 @@ final class UploadController
             $pages
         ));
 
-        $conn = Database::conn();
-        $reportId = $conn->executeQuery(
-            'INSERT INTO reports (user_id, filename, full_text, pages)
-             VALUES (:user_id, :filename, :full_text, :pages) RETURNING id',
-            [
-                'user_id'   => $user['sub'],
-                'filename'  => $file['name'],
-                'full_text' => $fullText,
-                'pages'     => json_encode($pages),
-            ]
-        )->fetchOne();
-
-        // Run weakness scan
+        // Run weakness scan before any DB writes so a failed scan leaves no orphan
         $scanner = new WeaknessScanner();
         $weaknesses = $scanner->scan($fullText, $pages);
 
-        foreach ($weaknesses as $w) {
-            $conn->insert('weaknesses', [
-                'report_id'  => $reportId,
-                'claim'      => $w['claim'],
-                'page'       => $w['page'],
-                'issue_type' => $w['issue_type'],
-                'severity'   => $w['severity'],
-            ]);
+        $conn = Database::conn();
+        $conn->beginTransaction();
+        try {
+            $reportId = $conn->executeQuery(
+                'INSERT INTO reports (user_id, filename, full_text, pages)
+                 VALUES (:user_id, :filename, :full_text, :pages) RETURNING id',
+                [
+                    'user_id'   => $user['sub'],
+                    'filename'  => $file['name'],
+                    'full_text' => $fullText,
+                    'pages'     => json_encode($pages),
+                ]
+            )->fetchOne();
+
+            foreach ($weaknesses as $w) {
+                $conn->insert('weaknesses', [
+                    'report_id'  => $reportId,
+                    'claim'      => $w['claim'],
+                    'page'       => $w['page'],
+                    'issue_type' => $w['issue_type'],
+                    'severity'   => $w['severity'],
+                ]);
+            }
+            $conn->commit();
+        } catch (\Throwable $e) {
+            $conn->rollBack();
+            throw $e;
         }
 
         echo json_encode([

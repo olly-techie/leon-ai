@@ -6,6 +6,12 @@ namespace App\Services;
 
 final class WeaknessScanner
 {
+    private const SEVERITIES = ['low', 'medium', 'high', 'critical'];
+    private const ISSUE_TYPES = [
+        'literature_review', 'methodology', 'sample_size', 'validity',
+        'results', 'objectives', 'limitations', 'novelty', 'writing', 'other',
+    ];
+
     private OpenRouter $llm;
 
     public function __construct()
@@ -65,6 +71,41 @@ PROMPT;
         ];
 
         $result = $this->llm->chatJson($system, $user, 'strong', $schema);
-        return $result['weaknesses'] ?? [];
+        return $this->sanitize($result['weaknesses'] ?? []);
+    }
+
+    /**
+     * Coerce model output to what the weaknesses table CHECK constraints accept.
+     */
+    private function sanitize(array $raw): array
+    {
+        $out = [];
+        foreach ($raw as $w) {
+            if (!is_array($w)) {
+                continue;
+            }
+            $claim = trim((string) ($w['claim'] ?? ''));
+            if ($claim === '') {
+                continue;
+            }
+
+            $severity = strtolower((string) ($w['severity'] ?? 'medium'));
+            if (!in_array($severity, self::SEVERITIES, true)) {
+                $severity = 'medium';
+            }
+
+            $issueType = strtolower((string) ($w['issue_type'] ?? 'other'));
+            if (!in_array($issueType, self::ISSUE_TYPES, true)) {
+                $issueType = 'other';
+            }
+
+            $out[] = [
+                'claim'      => $claim,
+                'page'       => max(1, (int) ($w['page'] ?? 1)),
+                'issue_type' => $issueType,
+                'severity'   => $severity,
+            ];
+        }
+        return $out;
     }
 }

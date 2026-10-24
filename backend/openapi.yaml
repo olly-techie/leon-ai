@@ -1,0 +1,407 @@
+openapi: 3.0.3
+info:
+  title: Defence Panel API
+  version: 1.0.0
+  description: AI-powered project defence/examination simulator backend
+  contact:
+    name: Freebuff API
+    url: https://freebuff.com
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Return API status
+      operationId: healthCheck
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  time:
+                    type: string
+  /api/auth/register:
+    post:
+      summary: Register a new user
+      description: Create a new account with email and password
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email address
+                password:
+                  type: string
+                  minLength: 8
+                  description: User password (minimum 8 characters)
+      responses:
+        '200':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      email:
+                        type: string
+        '400':
+          description: Invalid email or password too short
+        '409':
+          description: Email already registered
+  /api/auth/login:
+    post:
+      summary: User login
+      description: Authenticate and receive JWT token
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: User email address
+                password:
+                  type: string
+                  description: User password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      email:
+                        type: string
+        '401':
+          description: Invalid email or password
+  /api/upload:
+    post:
+      summary: Upload and analyze PDF report
+      description: Upload a PDF project report, run AI weakness scan
+      operationId: upload
+      requestBody:
+        required: true
+        multipart/form-data:
+          schema:
+            type: object
+            properties:
+              pdf:
+                type: string
+                format: binary
+                description: PDF file (max 15MB, must be valid PDF)
+      responses:
+        '200':
+          description: Report uploaded with weaknesses
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  report_id:
+                    type: string
+                    format: uuid
+                  weaknesses:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        claim:
+                          type: string
+                        page:
+                          type: integer
+                        issue_type:
+                          type: string
+                          enum: [literature_review, methodology, sample_size, validity, results, objectives, limitations, novelty, writing, other]
+                        severity:
+                          type: string
+                          enum: [low, medium, high, critical]
+        '400':
+          description: Invalid file type or too large
+        '422':
+          description: Could not extract text from PDF
+  /api/session/start:
+    post:
+      summary: Start a new panel session
+      description: Begin an examination panel session for a report
+      operationId: startSession
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - report_id
+              properties:
+                report_id:
+                  type: string
+                  format: uuid
+                  description: ID of the uploaded report
+                difficulty:
+                  type: string
+                  enum: [friendly, normal, brutal]
+                  default: normal
+                  description: Examiner strictness level
+      responses:
+        '200':
+          description: Session started, first question assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                    format: uuid
+                  next_turn:
+                    type: object
+                    properties:
+                      examiner:
+                        type: string
+                        enum: [hostile_external, methodology_purist, so_what_skeptic]
+                      question:
+                        type: string
+                      cited_page:
+                        type: integer
+                      is_followup:
+                        type: boolean
+        '400':
+          description: Report ID required
+        '404':
+          description: Report not found or access denied
+  /api/session/answer:
+    post:
+      summary: Submit answer to current question
+      description: Submit student answer, get scores and next question
+      operationId: answerQuestion
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - session_id
+                - answer_text
+              properties:
+                session_id:
+                  type: string
+                  format: uuid
+                  description: Active session ID
+                answer_text:
+                  type: string
+                  description: Student's answer text
+      responses:
+        '200':
+          description: Answer evaluated, scores + next turn
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  scores:
+                    type: object
+                    properties:
+                      accuracy:
+                        type: integer
+                        minimum: 0
+                        maximum: 10
+                      evidence:
+                        type: integer
+                        minimum: 0
+                        maximum: 10
+                      composure:
+                        type: integer
+                        minimum: 0
+                        maximum: 10
+                  feedback:
+                    type: string
+                  model_answer:
+                    type: string
+                  next_turn:
+                    type: object
+                    properties:
+                      examiner:
+                        type: string
+                        enum: [hostile_external, methodology_purist, so_what_skeptic]
+                      question:
+                        type: string
+                      cited_page:
+                        type: integer
+                      is_followup:
+                        type: boolean
+                  session_complete:
+                    type: boolean
+        '400':
+          description: Session ID and answer required, or no pending question
+        '404':
+          description: Active session not found
+  /api/session/report:
+    get:
+      summary: Get session scorecard
+      description: Retrieve full scorecard for a completed session
+      operationId: getSessionReport
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: session_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+            description: Session ID
+      responses:
+        '200':
+          description: Session report with averages and turn history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  session_id:
+                    type: string
+                    format: uuid
+                  difficulty:
+                    type: string
+                    enum: [friendly, normal, brutal]
+                  status:
+                    type: string
+                    enum: [active, completed, abandoned]
+                  averages:
+                    type: object
+                    properties:
+                      accuracy:
+                        type: integer
+                        minimum: 0
+                        maximum: 10
+                      evidence:
+                        type: integer
+                        minimum: 0
+                        maximum: 10
+                      composure:
+                        type: integer
+                        minimum: 0
+                        maximum: 10
+                      overall:
+                        type: number
+                        minimum: 0
+                        maximum: 10
+                  weakness_map:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        claim:
+                          type: string
+                        page:
+                          type: integer
+                        issue_type:
+                          type: string
+                          enum: [literature_review, methodology, sample_size, validity, results, objectives, limitations, novelty, writing, other]
+                        severity:
+                          type: string
+                          enum: [low, medium, high, critical]
+                  dangerous_questions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        examiner:
+                          type: string
+                        question:
+                          type: string
+                        cited_page:
+                          type: integer
+                        your_answer:
+                          type: string
+                        model_answer:
+                          type: string
+                  turns:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        examiner:
+                          type: string
+                        question:
+                          type: string
+                        cited_page:
+                          type: integer
+                        is_followup:
+                          type: boolean
+                        answer:
+                          type: string
+                        accuracy:
+                          type: integer
+                        evidence:
+                          type: integer
+                        composure:
+                          type: integer
+                        feedback:
+                          type: string
+                        model_answer:
+                          type: string
+        '400':
+          description: Session ID required
+        '404':
+          description: Session not found
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+tags:
+  - name: Health
+    description: API health and info
+  - name: Auth
+    description: Authentication endpoints
+  - name: Reports
+    description: PDF report upload and weakness scanning
+  - name: Sessions
+    description: Panel examination sessions
+security:
+  - bearerAuth: []

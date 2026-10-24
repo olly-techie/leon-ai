@@ -73,6 +73,27 @@ PROMPT;
             ],
         ];
 
-        return $this->llm->chatJson($system, $user, 'strong', $schema);
+        $result = $this->llm->chatJson($system, $user, 'strong', $schema);
+        return $this->normalize($result);
+    }
+
+    /**
+     * Coerce model output: scores may arrive as strings or out of range,
+     * which would trip the turns table CHECK constraints.
+     */
+    private function normalize(array $result): array
+    {
+        $clamp = fn($v) => max(0, min(10, (int) ($v ?? 0)));
+        $scores = is_array($result['scores'] ?? null) ? $result['scores'] : [];
+
+        return [
+            'scores' => [
+                'accuracy'  => $clamp($scores['accuracy'] ?? 0),
+                'evidence'  => $clamp($scores['evidence'] ?? 0),
+                'composure' => $clamp($scores['composure'] ?? 0),
+            ],
+            'feedback'     => (string) ($result['feedback'] ?? ''),
+            'model_answer' => (string) ($result['model_answer'] ?? ''),
+        ];
     }
 }
